@@ -55,7 +55,7 @@ head(temp,3)
 tail(temp,3)
 ```
 
-## 5. Summary of potentail approach
+## 5. Summary of a potential approach
 
 My main goal is prediction, specifically using past data to forecast future values. For this, the main steps are:
 
