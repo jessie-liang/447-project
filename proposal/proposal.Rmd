@@ -1,0 +1,67 @@
+---
+title: "Project Proposal"
+output: pdf_document
+date: "2025-03-12"
+author: Jessie Liang (52819596)
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. Team members
+
+This is an individual project. Only Jessie Liang (student number: 52819596) is involved in doing it.
+
+## 2. Project theme
+
+This project will address the theme called `time series and state-space models`.
+
+## 3. GitHub repo link
+
+https://github.com/jessie-liang/447-project.git
+
+## 4. Two real-world datasets
+
+### 4.1 Monthly consumer price index (CPI) aggregated for all items in Canada (2000 - 2024)
+
+**URL**: https://www150.statcan.gc.ca/t1/tbl1/en/cv.action?pid=1810000401
+
+(Source: Statistics Canada)
+
+```{r 4.1, message = FALSE, echo=FALSE}
+library(tidyverse)
+cpi <- read.csv("../data/consumer_price_index.csv")[910:1209,]
+cpi.ts <- ts(cpi, start = c(2000,1), frequency = 12)
+year <- rep(2000:2024, each = 12)
+month <- rep(1:12, times = 25)
+cpi <- data.frame(year, month, cpi)
+head(cpi,3)
+tail(cpi,3)
+```
+
+### 4.2 Vancouver daily average temperature (June 15,2022 - March 10, 2025)
+
+**URL**: https://vancouver.weatherstats.ca/download.html
+
+(Source: Weather Dashboard for Vancouver)
+
+```{r 4.2,  message = FALSE, echo=FALSE}
+temp <- read.csv("../data/vancouver_weather.csv")[,c(1,4)]
+temp <- map_df(temp, rev)
+temp <- data.frame(temp$date, temp$avg_temperature)
+head(temp,3)
+tail(temp,3)
+```
+
+## 5. Summary of potentail approach
+
+My main goal is prediction, specifically using past data to forecast future values. For this, the main steps are:
+
+(1) Split the data set into a training set (relatively large) and a testing set (relatively small).
+
+(2) Use MCMC (ideally Stan) to fit a model on the training set, setting observations in the testing set as latent variables.
+
+(3) Obtain the posterior mean of these latent variables as point forecasts.
+
+(4) Compute RMSE using the point forecasts and real data in the testing set to assess prediction performance.
