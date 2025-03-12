@@ -61,8 +61,8 @@ My main goal is prediction, specifically using past data to forecast future valu
 
 (1) Split the data set into a training set (relatively large) and a testing set (relatively small).
 
-(2) Use MCMC (ideally Stan) to fit a model on the training set, setting observations in the testing set as latent variables.
+(2) Use MCMC (ideally Stan) to fit a model on the training set, setting observations in the testing set (those we want to predict) as latent variables.
 
 (3) Obtain the posterior mean of these latent variables as point forecasts.
 
-(4) Compute RMSE using the point forecasts and real data in the testing set to assess prediction performance.
+(4) Compute RMSE using the point forecasts and the real data in the testing set to assess prediction performance.
