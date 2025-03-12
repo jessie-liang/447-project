@@ -50,6 +50,7 @@ tail(cpi,3)
 temp <- read.csv("../data/vancouver_weather.csv")[,c(1,4)]
 temp <- map_df(temp, rev)
 temp <- data.frame(temp$date, temp$avg_temperature)
+colnames(temp) <- c("date", "avg_temperature")
 head(temp,3)
 tail(temp,3)
 ```
