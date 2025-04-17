@@ -6,16 +6,14 @@ data {
 
 parameters {
   vector[2] phi;             // autoregression coeff
-  vector[2] theta;                // moving avg coeff
+  vector[2] theta;           // moving avg coeff
   real<lower=0> sigma;       // noise scale
-  //vector[T] err;
-  //vector[T] nu;
 }
 
 transformed parameters {
-  vector[T] err;
-  vector[T] nu;
-  nu[1] = 0;     // assume err[0] == 0
+  vector[T] err;            // error for time t
+  vector[T] nu;             // prediction for time t
+  nu[1] = 0;                // assume err[0] == 0
   err[1] = y[1] - nu[1];
   nu[2] = phi[1] * nu[1] + theta[1] * err[1];
   err[2] = y[2] - nu[2];
@@ -27,14 +25,10 @@ transformed parameters {
 }
 
 model {
-  //vector[T] nu;              // prediction for time t
-  //vector[T] err;             // error for time t
-  
-  
-  phi ~ normal(0, 2);        // priors
-  theta ~ normal(0, 2);
-  sigma ~ cauchy(0, 5);
-  err ~ normal(0, sigma);    // error model
+  phi ~ normal(0, 100);        // priors
+  theta ~ normal(0, 100);
+  sigma ~ exponential(0.1);
+  err ~ normal(0, sigma);     // error model
 }
 
 generated quantities {

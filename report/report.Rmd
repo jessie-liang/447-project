@@ -9,33 +9,89 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-### 0. GitHub repo link
+## 0. GitHub repo link
 
 https://github.com/jessie-liang/447-project.git
 
-### 1. Problem formulation
+## 1. Problem formulation
 
 Due to various factors affecting Canadian economic environment (e.g. policy making, international relation, economic development, etc), the consumer price index (CPI) has been climbing yet fluctuating over the past 20 years. CPI is an index describing changes in prices faced by Canadian consumers by comparing the cost of a representative basket of goods and services through time (Statistics Canada, 2019). CPI is widely used to measure living costs of residents and provide insights of inflation. Therefore, it would be beneficial for all economic agents if future CPI index could be predicted accurately so as to warn people to take necessary and timely actions. The problem that this project aims to solve is to build a reasonably accurate prediction model that helps forecast future CPI values, through a Bayesian approach.
 
 CPI data is essentially a time series, where dependence among neighboring observations cannot be ignored. To incorporate this characteristic into our Bayesian framework, state-space model and ARMA model are used for modelling in this project. One of the main challenges is to elaborately capture all features that the time series exhibits, including an upward trend and cyclical variations, and then yield predictions that also show these features. The steps to tackle this problem are: (1) Split the original dataset into a training set and a testing set. (2) Decompose the training set using LOESS method (Cleveland et al., 1990) into a trend component, a seasonal component and remainders. (3) Model the trend component using the state-space model and calculate predictions of this component. (4) Model the remainders component using ARMA model and calculate predictions of this component. (5) Obtain point forecasts by summing three parts, namely predictions of the trend component, the corresponding values of the seasonal component, and predictions of the remainders component. (6) Obtain 95% credible intervals by calculating the 2.5% and 97.5% quantile of the posterior samples of point forecasts. (7) Compare the prediction results with the original testing set.
 
-### 2. Literature review
+## 2. Literature review
 
-### 3. Data analysis
+## 3. Data analysis
 
-### 4. Discussion
+As mentioned above, LOESS decomposition is applied first before we build separate models for each component. The visualization of the decomposition is shown in Figure 1. As we can see, the trend component is smooth and upward sloping, which can be well approximated by a linear regression. The seasonal component is repeating the same pattern again and again, without any randomness involved. Actually the values of the seasonal component are exactly the same in each cycle, so Bayesian modelling is not needed for this deterministic relation. The remainder component seems random with mean zero, and this is where an ARMA model is adopted to model this process.
 
-### 5. Bibliography
+![LOESS decomposition](/Users/jessieliang/Desktop/STAT 447/447-project/report/screenshots/1.png){width=65%}
+
+\newpage
+
+### 3.1 Trend component modelling
+
+**Mathematical model**:
+$$\sigma_1 \sim \text{Exp}(0.1)$$
+$$\sigma_2 \sim \text{Exp}(0.1)$$
+$$\text{slope} \sim \text{Normal}(0, 100)$$
+$$\text{intercept} \sim \text{Normal}(0, 100)$$
+$$x_i \sim \text{Normal}(\text{intercept} + \text{slope} \cdot x_{i-1}, \sigma_1), \text{  for  } i=1,\ldots, N_{\text{train}}$$
+$$y_i \sim \text{Normal}(x_i, \sigma_2), \text{  for  } i=1,\ldots, N_{\text{train}}$$
+
+**Prior choice explanation**: (1) $\sigma_1, \sigma_2$ are positive-valued, which match the support of the exponential distribution. Exp(0.1) is relatively flat, flexibly enabling large values to be considered. (2) slope and intercept are real numbers but are potentially unbounded, so a normal distribution is appropriate here. The standard deviation of the normal is set to 100, making the distribution flat. So large values, either positive or negative, could be taken into consideration.
+
+
+### 3.2 Remainder component modelling
+
+An ARMA(2,2) model is adopted here, whose defining equation is: $X_t = \phi_1 X_{t-1} + \phi_2 X_{t-2} + Z_t + \theta_1 Z_{t-1} + \theta_2 Z_{t-2}$, where $\{Z_t\}$ is a white noise process and $\{X_t\}$ is the process we are interested in. Translating this definition into Stan code, we have the following Stan model:
+
+**Mathematical model**:
+
+$$\phi_i \sim \text{Normal}(0,100), \text{ for } i=1,2$$
+$$\theta_i \sim \text{Normal}(0,100), \text{ for } i=1,2$$
+$$\sigma \sim \text{Exp}(0.1)$$
+$$\text{err}_0=0; \text{ } \text{err}_i = y_i - \nu_i, \text{ for } i=1, \ldots, T $$
+$$\nu_1 = 0, \text{ } \nu_2=\phi_1 \nu_1 + \theta_1 \text{err}_1$$
+$$\nu_i = \phi_1 \nu_{i-1} + \phi_2 \nu_{i-2} + \theta_1 \text{err}_{i-1} + \theta_2 \text{err}_{i - 2}, \text{ for } i=3, \ldots, T$$
+$$\text{err}_i \sim \text{Normal}(0, \sigma), \text{ for } i=1,\ldots,T$$
+Here $\nu$ represents the true values of remainders (which are latent), while err represents the difference between observed values and true values, and err has a normal distribution.
+
+**Prior choice explanation**: (1) $\sigma$ is positive-valued, which can be modeled by the exponential distribution. The choice of $\lambda = 0.1$ is due to the same reasoning above.  (2) $\phi, \theta$ and err are real numbers that are potentially unbounded, so a normal distribution should be used. SD of $\phi$ and $\theta$ aims to be large due to the same reasoning before. SD of err is $\sigma$, which is already being modeled.
+
+### 3.3 Posterior evaluation
+
+As a posterior predictive check, calibration should first be examined. Specifically, a 99% credible interval is calibrated if it captures the true data 99% of the time. If it is already calibrated, then further posterior checks are not necessary. If it is not calibrated, then we need to go through Bayesian workflow to identify the problem.
+
+Note that time series has inherent chronological order. Therefore, it only makes sense to use past data to predict future values, not the other way around. This means that the leave-one-out technique cannot be used to check calibration based on the training set, since, for example, the last $n-1$ data points cannot be used to predict the first data point, otherwise we are predicting the past using the future. Due to this characteristic of time series, I used the training set to predict the test set and compute a 99% credible interval for each data point in the test set. Then I look at the proportion of test data that is captured by its corresponding credible interval and compare this proportion with 99% to check calibration.
+
+![Prediction using the test set](/Users/jessieliang/Desktop/STAT 447/447-project/report/screenshots/2.png){width=65%}
+
+<table>
+
+size of test set   number of data points captured by prediction interval      proportion being captured         
+----------------   -------------------------------------------------------   ---------------------------     
+      30                                30                                              100\%
+
+</table>
+
+
+## 4. Discussion
+
+## 5. Bibliography
 
 1. Statistics Canada. (2019, May 28). Consumer price index portal. Www.statcan.gc.ca. https://www.statcan.gc.ca/en/subjects-start/prices_and_price_indexes/consumer_price_indexes
 
 2. Cleveland, R. B., Cleveland, W. S., & Terpenning, I. (1990). STL: A seasonal-trend decomposition procedure based on loess. Journal of Official Statistics, 6(1), 3. Retrieved from https://www.proquest.com/scholarly-journals/stl-seasonal-trend-decomposition-procedure-based/docview/1266805989/se-2
 
-### 6. Appendix
+3. Time-Series Models. (2025). Stan Docs. https://mc-stan.org/docs/stan-users-guide/time-series.html
+
+## 6. Appendix
 
 ```{r 1, message = FALSE}
 library(tidyverse)
 library(forecast)
+set.seed(1)
 cpi <- read.csv("../data/consumer_price_index.csv")[910:1209,]
 year <- rep(2000:2024, each = 12)
 month <- rep(1:12, times = 25)
@@ -45,9 +101,11 @@ cpi.ts <- ts(cpi$cpi, start = c(2000,1), frequency = 12)
 ```
 
 ```{r 2}
+set.seed(1)
 training <- window(cpi.ts, c(2000,1), c(2022,6), frequency = 12)
 test.ts <- window(cpi.ts, c(2022,7), c(2024,12), frequency = 12)
 cpi.stl <- stl(training, s.window = "periodic")
+plot(cpi.stl)
 trend <- cpi.stl$time.series[,"trend"]
 seasonals <- cpi.stl$time.series[,"seasonal"]
 remainders <- cpi.stl$time.series[,"remainder"]
@@ -56,7 +114,7 @@ auto.arima(remainders)
 # the result shows the most appropriate model for remainders is: ARMA(2,2)
 ```
 
-```{r 3, message=FALSE, warning=FALSE}
+```{r 3, message=FALSE, warning=FALSE, error=FALSE}
 require(rstan)
 
 fit = stan(
@@ -65,7 +123,7 @@ fit = stan(
   data = list(N_train=270, 
               N_test=30,
               y_train=as.numeric(trend)),        
-  iter = 2000,
+  iter = 1800,
   refresh = 0
 )
 
@@ -86,7 +144,50 @@ trend_posterior <- samples$predictions
 trend_posterior <- as.data.frame(trend_posterior)
 ```
 
-```{r 4, message=FALSE, warning=FALSE}
+```{r 3.1, eval=FALSE}
+# The following is the stan code in the file "my_stan_3.stan":
+
+data {
+  int<lower=0> N_train;
+  int<lower=0> N_test;
+  vector[N_train] y_train;
+}
+
+parameters {
+  real<lower=0> sigma1;
+  real<lower=0> sigma2;
+  real slope;
+  real intercept;
+  vector[N_train] x_train;
+}
+
+model {
+  sigma1 ~ exponential(0.1);
+  sigma2 ~ exponential(0.1);
+  slope ~ normal(0,100);
+  intercept ~ normal(0,100);
+  
+  for (i in 2:N_train) {
+    x_train[i] ~ normal(intercept + slope * x_train[i-1], sigma1);
+  }
+  
+  for (j in 1:N_train) {
+    y_train[j] ~ normal(x_train[j], sigma2);
+  }
+}
+
+generated quantities {
+  vector[N_test] predictions;
+  
+  predictions[1] = normal_rng(intercept + slope * x_train[N_train], sigma1);
+
+  for (k in 2:N_test) {
+    predictions[k] = normal_rng(intercept + slope * predictions[k-1], sigma1);
+  }
+}
+```
+
+```{r 4, message=FALSE, warning=FALSE, error=FALSE}
 require(rstan)
 
 fit = stan(
@@ -95,7 +196,7 @@ fit = stan(
   data = list(T=270, 
               N_test=30,
               y=as.numeric(remainders)),        
-  iter = 2000,
+  iter = 1800,
   refresh = 0
 )
 
@@ -116,7 +217,59 @@ remainder_posterior <- samples$predictions
 remainder_posterior <- as.data.frame(remainder_posterior)
 ```
 
-```{r 5, fig.width=4.5, fig.height=4.5}
+```{r 4.1, eval=FALSE}
+# The following is the stan code in the file "my_stan_4.stan":
+# Citation: This is adapted from the stan user guide:
+#           https://mc-stan.org/docs/stan-users-guide/time-series.html
+
+data {
+  int<lower=2> T;            // num observations
+  int<lower=0> N_test;
+  vector[T] y;               // observed outputs
+}
+
+parameters {
+  vector[2] phi;             // autoregression coeff
+  vector[2] theta;           // moving avg coeff
+  real<lower=0> sigma;       // noise scale
+}
+
+transformed parameters {
+  vector[T] err;            // error for time t
+  vector[T] nu;             // prediction for time t
+  nu[1] = 0;                // assume err[0] == 0
+  err[1] = y[1] - nu[1];
+  nu[2] = phi[1] * nu[1] + theta[1] * err[1];
+  err[2] = y[2] - nu[2];
+  
+  for (t in 3:T) {
+    nu[t] = phi[1] * nu[t - 1] + phi[2] * nu[t - 2] + theta[1] * err[t - 1] + theta[2] * err[t - 2];
+    err[t] = y[t] - nu[t];
+  }
+}
+
+model {
+  phi ~ normal(0, 100);        // priors
+  theta ~ normal(0, 100);
+  sigma ~ exponential(0.1);
+  err ~ normal(0, sigma);     // error model
+}
+
+generated quantities {
+  vector[N_test] predictions;
+  
+  predictions[1] = phi[1] * nu[T] + phi[2] * nu[T-1] + theta[1] * err[T] + theta[2] * err[T-1];
+  
+  predictions[2] = phi[1] * predictions[1] + phi[2] * nu[T] + theta[2] * err[T];
+
+  for (k in 3:N_test) {
+    predictions[k] = phi[1] * predictions[k-1] + phi[2] * predictions[k-2];
+  }
+}
+```
+
+```{r 5, fig.width=6, fig.height=5}
+set.seed(1)
 trend_estimates <- ts(df_trend$point_forecast, start = c(2022,7), frequency = 12)
 seasonal_estimates <- window(seasonals, start = c(2000,7), end = c(2002,12))
 seasonal_estimates <- ts(as.numeric(seasonal_estimates), start = c(2022,7), frequency = 12)
@@ -126,7 +279,7 @@ posterior <- trend_posterior + remainder_posterior
 for (i in 1:30) {
   posterior[,i] <- posterior[,i] + as.numeric(seasonal_estimates)[i]
 }
-quantiles <- apply(posterior[],2,quantile,probs=c(0.025,0.975))
+quantiles <- apply(posterior[],2,quantile,probs=c(0.005,0.995))
 lower.bound <- quantiles[1,]
 upper.bound <- quantiles[2,]
 
@@ -143,4 +296,22 @@ ts.plot(test.ts, point.forcast.ts, lower.bound.ts, upper.bound.ts,
         )
 legend("topleft", legend = c("point forecast", "real data", "prediction interval"),
 col = c("red", "black","blue"),lty = c(1,1,1), cex=0.8)
+```
+
+```{r 6}
+set.seed(1)
+warning <- 0
+real_data <- as.vector(test.ts)
+for (i in 1:30) {
+  if (real_data[i] < lower.bound[i] | real_data[i] > upper.bound[i]) {
+    warning <- warning + 1
+  }
+}
+proportion_captured <- 1-warning/30
+
+cat("The number of test data outside its corresponding prediction interval is: ",
+    warning, "\n")
+
+cat("Proportion of test data captured by corresponding prediction interval is: ",
+    proportion_captured, "\n")
 ```

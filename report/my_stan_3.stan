@@ -36,4 +36,3 @@ generated quantities {
     predictions[k] = normal_rng(intercept + slope * predictions[k-1], sigma1);
   }
 }
-
