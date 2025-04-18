@@ -1,7 +1,6 @@
 ---
-title: "STAT 447 Project Final Report"
+title: "Time Series Forecasting with Bayesian Approach"
 author: "Jessie Liang (52819596)"
-date: "2025-04-08"
 output: pdf_document
 ---
 
@@ -17,17 +16,19 @@ https://github.com/jessie-liang/447-project.git
 
 Due to various factors affecting Canadian economic environment (e.g. policy making, international relation, economic development, etc), the consumer price index (CPI) has been climbing yet fluctuating over the past 20 years. CPI is an index describing changes in prices faced by Canadian consumers by comparing the cost of a representative basket of goods and services through time (Statistics Canada, 2019). CPI is widely used to measure living costs of residents and provide insights of inflation. Therefore, it would be beneficial for all economic agents if future CPI index could be predicted accurately so as to warn people to take necessary and timely actions. The problem that this project aims to solve is to build a reasonably accurate prediction model that helps forecast future CPI values, through a Bayesian approach.
 
-CPI data is essentially a time series, where dependence among neighboring observations cannot be ignored. To incorporate this characteristic into our Bayesian framework, state-space model and ARMA model are used for modelling in this project. One of the main challenges is to elaborately capture all features that the time series exhibits, including an upward trend and cyclical variations, and then yield predictions that also show these features. The steps to tackle this problem are: (1) Split the original dataset into a training set and a test set. (2) Decompose the training set using LOESS method (Cleveland et al., 1990) into a trend component, a seasonal component and remainders. (3) Model the trend component using the state-space model and calculate predictions of this component. (4) Model the remainders component using ARMA model and calculate predictions of this component. (5) Obtain point forecasts by summing three parts, namely predictions of the trend component, the corresponding values of the seasonal component, and predictions of the remainders component. (6) Obtain 99% credible intervals by calculating the 0.5% and 99.5% quantiles of the posterior samples of point forecasts. (7) Compare the prediction results with the original test set.
+CPI data is essentially a time series, where dependence among neighboring observations cannot be ignored. To incorporate this characteristic into our Bayesian framework, state-space model and ARMA model are used for modelling in this project. One of the main challenges is to elaborately capture all features that the time series exhibits, including an upward trend and cyclical variations, and then yield predictions that also show these features. The steps to tackle this problem are: (1) Split the original dataset into a training set and a test set. (2) Decompose the training set using LOESS method (Cleveland et al., 1990) into a trend component, a seasonal component and remainders. (3) Model the trend component using the state-space model and calculate predictions of this component. (4) Model the remainders component using ARMA model and calculate predictions of this component. (5) Obtain point forecasts by summing three parts, namely predictions of the trend component, the corresponding values of the seasonal component, and predictions of the remainders component. (6) Obtain 99% credible intervals by calculating the 0.5% and 99.5% quantile of the posterior samples of point forecasts. (7) Compare the prediction results with the original test set.
 
 ## 2. Literature review
 
+Multiple classical approaches have been developed for time series forecasting in the time domain. Box-Jenkins method, a model-based approach, suggests first searching for an appropriate model such as a SARIMA model for the time series. Then, point forecasts can be obtained by utilizing the fitted model equation. Previous observations of the time series and corresponding residuals need to be calculated and then be plugged into the model equation to get predictions of future values. As for the prediction interval, the model equation needs to be transformed into the moving average (MA) representation of possibly infinite order. The width of the prediction interval is then formed by plugging the coefficients of the MA representation into the derived formula. Note that the width of the prediction interval becomes wider as the lead time increases, since we are more uncertain about the farther future than the near future. (Newbold, 1975)
+
+Apart from the above model-based approach, there is another class of non-parametric forecasting method called Holt-Winters method. This flexible approach allows the existence of a trend and seasonality in the original time series. Point forecasts are acquired by solving a recursive set of equations. Nevertheless, prediction intervals are not directly available unless additional distributional assumptions are made due to the non-parametric nature of this method. (Chatfield, 1978)
+
 ## 3. Data analysis
 
-As mentioned above, LOESS decomposition is applied first before we build separate models for each component. The visualization of the decomposition is shown in Figure 1. As we can see, the trend component is smooth and upward sloping, which can be well approximated by a linear regression. The seasonal component is repeating the same pattern again and again, without any randomness involved. Actually the values of the seasonal component are exactly the same in each cycle, so Bayesian modelling is not needed for this deterministic relation. The remainder component seems random with mean zero, and this is where an ARMA model is adopted to model this process.
+To capture all characteristics of the original time series, the prediction procedure is divided into multiple stages, ensuring each characteristic can be analyzed individually and then be summarized together to obtain aggregate results. As mentioned above, LOESS decomposition is applied first before we build separate models for each component. The visualization of the decomposition is shown in Figure 1. As we can see, the trend component is smooth and upward sloping, which can be well approximated by a linear regression. The seasonal component is repeating the same pattern again and again, without any randomness involved. Actually the values of the seasonal component are exactly the same in each cycle, so Bayesian modelling is not needed for this deterministic relation. The remainder component seems random with mean zero, and this is where an ARMA model is adopted to model this process.
 
-![LOESS decomposition](/Users/jessieliang/Desktop/STAT 447/447-project/report/screenshots/1.png){width=65%}
-
-\newpage
+![LOESS decomposition](screenshots/1.png){width=65%}
 
 ### 3.1 Trend component modelling
 
@@ -55,21 +56,21 @@ $$\text{err}_0=0; \text{ } \text{err}_i = y_i - \nu_i, \text{ for } i=1, \ldots,
 $$\nu_1 = 0, \text{ } \nu_2=\phi_1 \nu_1 + \theta_1 \text{err}_1$$
 $$\nu_i = \phi_1 \nu_{i-1} + \phi_2 \nu_{i-2} + \theta_1 \text{err}_{i-1} + \theta_2 \text{err}_{i - 2}, \text{ for } i=3, \ldots, T$$
 $$\text{err}_i \sim \text{Normal}(0, \sigma), \text{ for } i=1,\ldots,T$$
-Here $\nu$ represents the true values of remainders (which are latent), while err represents the difference between observed values and true values, and err has a normal distribution.
+Here $\nu$ represents the true values of remainders (which are latent), while err represents the difference between observed values and true values, and err has a normal distribution. Note that this model is adapted from the most recent Stan User Guide. (See the fifth bibliography below)
 
 **Prior choice explanation**: (1) $\sigma$ is positive-valued, which can be modeled by the exponential distribution. The choice of $\lambda = 0.1$ is due to the same reasoning above.  (2) $\phi, \theta$ and err are real numbers that are potentially unbounded, so a normal distribution should be used. SD of $\phi$ and $\theta$ aims to be large due to the same reasoning before. SD of err is $\sigma$, which is already being modeled.
 
 ### 3.3 Posterior evaluation
 
-As a posterior predictive check, calibration should first be examined. Specifically, a 99% credible interval is calibrated if it captures the true data 99% of the time. If it is already calibrated, then further posterior checks are not necessary. If it is not calibrated, then we need to go through the Bayesian workflow to identify the problem.
+As a posterior predictive check, calibration should first be examined. Specifically, a 99% credible interval is calibrated if it captures the true data 99% of the time. If it is already calibrated, then further posterior checks are not necessary. If it is not calibrated, then we need to go through the Bayesian workflow to identify the specific problems and fix them one by one.
 
-Note that time series has inherent chronological order. Therefore, it only makes sense to use past data to predict future values, but not the other way around. This means that the leave-one-out technique cannot be used to check calibration based on the training set, since, for example, the last $n-1$ data points cannot be used to predict the first data point, otherwise we are predicting the past using the future. Due to this characteristic of time series, I used the model built by the training set to predict the CPI index in the test set and compute a 99% credible interval for each data point in the test set. Then I look at the proportion of test data that is captured by its corresponding credible interval and compare this proportion with 99% to check calibration.
+Note that time series has inherent chronological order. Therefore, it only makes sense to use past data to predict future values, but not the other way around. This means that the leave-one-out technique cannot be used to check calibration based on the training set, since, for example, the last $n-1$ data points cannot be used to predict the first data point, otherwise we are predicting the past using the future. Due to this characteristic of time series, I used the model built by the training set to predict the CPI index in the test set and compute a 99% credible interval for each data point in the test set. Then I look at the proportion of test data that is captured by its corresponding 99% credible interval and compare this proportion with 99% to check calibration.
 
-The following is how I got the 99% credible intervals for each data point in the test set: This is a multi-step process to obtain point forecasts, by decomposing the original time series into 3 components (trend, seasonal and remainder). As mentioned above, the seasonal component does not involve any randomness, so we can treat it as a constant yet periodic series. Two Bayesian models are built separately for the trend and remainder component, giving two sets of posterior samples. Since the point forecasts are calculated by summing these 3 components, the aggregate posterior sample for each point forecast is also the sum of the corresponding seasonal value and the two posterior samples (for trend and remainder). This is because the posterior distribution of a sum of components can be formed by summing the draws from the posterior distributions of each component. After the aggregate posterior sample is available, the 99% credible interval is obtained by extracting the 0.5% and 99.5% quantile of this aggregate posterior sample.
+The following is how I got the 99% credible intervals for each data point in the test set: This is a multi-step process to obtain point forecasts, by decomposing the original time series into 3 components (trend, seasonal and remainder). As mentioned above, the seasonal component does not involve any randomness, so we can treat it as a constant yet periodic series. Two Bayesian models are built separately for the trend and remainder component, giving two sets of posterior samples. Since the point forecasts are calculated by summing these 3 components, the aggregate posterior sample for each point forecast is also the sum of the corresponding seasonal value and the two posterior samples (for trend and remainder). This is because the posterior distribution of a sum of components can be approximately formed by summing the draws from the posterior distributions of each component. After the aggregate posterior sample is available, the 99% credible interval is obtained by extracting the 0.5% and 99.5% quantile of this aggregate posterior sample.
 
 After computing point forecasts and their corresponding 99% credible intervals, the visualization and result summary is as follows:
 
-![Calibration check](/Users/jessieliang/Desktop/STAT 447/447-project/report/screenshots/2.png){width=55%}
+![Calibration check](screenshots/2.png){width=55%}
 
 <table>
 
@@ -89,9 +90,9 @@ The analysis has the following pros and cons:
 
 **Pros**:
 
-(1) According to Figure 2, the point forecasts follow the real data closely, exhibiting an upward trend and some cyclical variations. So the key features of the data are modeled correctly.
+(1) According to Figure 2, the point forecasts follow the real data closely, exhibiting an upward trend and some cyclical variations. So the key features of the data are captured correctly.
 
-(2) The credible intervals capture the true data 100% of the time, showing that they are calibrated.
+(2) The 99% credible intervals capture the true data 100% of the time, showing that they are calibrated.
 
 (3) The RMSE is 0.84, which is small compared to the scale of the data (between 150 and 160). So the prediction performance is satisfactory.
 
@@ -99,15 +100,22 @@ The analysis has the following pros and cons:
 
 (1) The point forecasts are smoother than real data, failing to capture the subtle fluctuations of the real data very accurately.
 
-(2) Leave-one-out posterior predictive check is not applicable here. Instead our calibration check relies purely on the test set. The size of the test set is 30, which is not large enough. However, it cannot be much larger than 30 due to the characteristic of this CPI time series. Specifically, the pattern of the data changed in 2020 because the CPI index has increased more rapidly since 2020 than before. So we need enough data points after 2020 in the training set so as to yield a model with satisfactory predictive performance. If, however, there is no enough data after 2020 in the training set, then the model will only learn the pattern of the data before 2020. As a result, the point forecasts will be much lower than the real data in the test set. That is, our model does poorly in prediction. Due to limited data after 2020 (we have only 48 data points in total), the number of data points allocated to the test set cannot be too large. So 30 is already close to the largest number we can allocate to the test set, after taking prediction performance into account.
+(2) Leave-one-out posterior predictive check is not applicable here. Instead our calibration check relies purely on the test set. The size of the test set is 30, which is not large enough. However, it cannot be much larger than 30 due to the characteristic of this time series. Specifically, the pattern of the data changed in 2020 because the CPI index has increased more rapidly since 2020 than before. So we need enough data points after 2020 in the training set so as to yield a model with satisfactory predictive performance. If, however, there is no enough data after 2020 in the training set, then the model will only learn the pattern of the data before 2020. As a result, the point forecasts will be much lower than the real data in the test set. That is, our model does poorly in prediction. Due to limited data after 2020 (we have only 48 data points in total), the number of data points allocated to the test set cannot be too large. So 30 is already close to the largest number we can allocate to the test set, after taking prediction performance into account.
+
+\newpage
 
 ## 5. Bibliography
 
-1. Statistics Canada. (2019, May 28). Consumer price index portal. Www.statcan.gc.ca. https://www.statcan.gc.ca/en/subjects-start/prices_and_price_indexes/consumer_price_indexes
+1. Chatfield, C. (1978). The Holt-Winters Forecasting Procedure. Journal of the Royal Statistical Society. Series C (Applied Statistics), 27(3), 264–279. https://doi.org/10.2307/2347162
 
 2. Cleveland, R. B., Cleveland, W. S., & Terpenning, I. (1990). STL: A seasonal-trend decomposition procedure based on loess. Journal of Official Statistics, 6(1), 3. Retrieved from https://www.proquest.com/scholarly-journals/stl-seasonal-trend-decomposition-procedure-based/docview/1266805989/se-2
 
-3. Time-Series Models. (2025). Stan Docs. https://mc-stan.org/docs/stan-users-guide/time-series.html
+3. Newbold, P. (1975). The Principles of the Box-Jenkins Approach. Operational Research Quarterly (1970-1977), 26(2), 397–412. https://doi.org/10.2307/3007750
+
+4. Statistics Canada. (2019, May 28). Consumer price index portal. Www.statcan.gc.ca. https://www.statcan.gc.ca/en/subjects-start/prices_and_price_indexes/consumer_price_indexes
+
+5. Time-Series Models. (2025). Stan Docs. https://mc-stan.org/docs/stan-users-guide/time-series.html
+
 
 ## 6. Appendix
 
